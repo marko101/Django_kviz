@@ -12,15 +12,15 @@ def is_ajax(request):
 
 class QuizListView(ListView):
     model = Quiz
-    template_name = 'quizes/main.html'
+    template_name = "quizes/main.html"
 
 
 def quiz_view(request, pk):
-    quiz=Quiz.objects.get(pk=pk)
-    return render(request, 'quizes/quiz.html', {'obj':quiz})
+    quiz = Quiz.objects.get(pk=pk)
+    return render(request, "quizes/quiz.html", {"obj": quiz})
 
 def quiz_data_view(request, pk):
-    quiz = Quiz.objects.get(pk=pk) #daje id kviza
+    quiz = Quiz.objects.get(pk=pk)
     questions = []
     for q in quiz.get_questions():
         answers = []
@@ -34,59 +34,45 @@ def quiz_data_view(request, pk):
     })
 
 def save_quiz_view(request, pk):
-    print(request.POST)
+    #print(request.POST)
     if is_ajax(request=request):
         questions = []
-        data = request.POST
-        data_ = dict(data.lists())
-        #print(data_)
-        #data_.pop('csrfmiddlewaretoken')
-        #print(type(data))
-        #print(type(data_))
-        data_.pop('csrfmiddlewaretoken')
+        data = dict(request.POST)
+        data.pop('csrfmiddlewaretoken')
 
-        for k in data_.keys():
-            print('key:', k)
+        for k in data.keys():
             question = Question.objects.get(text=k)
             questions.append(question)
-        print(questions)
 
         user = request.user
         quiz = Quiz.objects.get(pk=pk)
 
         score = 0
-        multipier = 100 / quiz.number_of_questions
-        results= []
+        multiplier = 100 / quiz.number_of_questions
+        results = []
         correct_answer = None
 
         for q in questions:
-            a_selected = request.POST.get(str(q.text))
-            print('selected', a_selected) #ovaj for je sve šta mi treba. printa selektovane vrednosti
-
+            a_selected = request.POST.get(q.text)
             if a_selected != "":
                 question_answers = Answer.objects.filter(question=q)
                 for a in question_answers:
                     if a_selected == a.text:
                         if a.correct:
-                            score +=1
+                            score += 1
                             correct_answer = a.text
                     else:
                         if a.correct:
-                            correct_answer = a.text 
-
-                results.append({str(q): {'correct_answer': correct_answer, 'answered': a_selected, }})
+                                correct_answer = a.text
+                results.append({str(q): {'correct_answer': correct_answer, 'answered': a_selected}})
             else:
                 results.append({str(q): 'not answered'})
+    
+        score *= multiplier
+        Result.objects.create(quiz=quiz,user=user, score=score)
 
-        score_ = score * multipier
-        Result.objects.create(quiz=quiz, user=user, score=score_)
-
-        if score_ >= quiz.required_score_to_pass:
-            return JsonResponse({'passed': True, 'score':score_, 'results':results})
+        if score >= quiz.required_score_to_pass:
+            return JsonResponse({'passed': True, 'score': score, 'results': results})
         else:
-            return JsonResponse({'text': 'works'})
-
-
-    return JsonResponse({'text': False, 'score':score_, 'results':results})
-
-
+            return JsonResponse({'passed': False, 'score': score, 'results': results})
+            
